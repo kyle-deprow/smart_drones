@@ -25,37 +25,40 @@ from TTS.tts.utils.speakers import SpeakerManager
 from smart_drones.speech_bootstrap.util import load_subject_data
 
 # model vars 
-MODEL_PATH = 'best_model.pth.tar'
+MODEL_PATH = 'content/best_model.pth.tar'
 CONFIG_PATH = 'config.json'
-TTS_LANGUAGES = "language_ids.json"
-TTS_SPEAKERS = "speakers.json"
+TTS_LANGUAGES = 'content/language_ids.json'
+TTS_SPEAKERS = 'content/speakers.json'
 USE_CUDA = torch.cuda.is_available()
-CONFIG_SE_PATH = "config_se.json"
-CHECKPOINT_SE_PATH = "SE_checkpoint.pth.tar"
+CONFIG_SE_PATH = 'config_SE.json'
+CHECKPOINT_SE_PATH = 'SE_checkpoint.pth.tar'
 WAV_EXT = '.wav'
+SYNTHESIS_DIR = 'synthesis'
 
-class PhraseSynthesize():
-  def __init__(self, zeroshot_dir: str, participant_dir: str):
-    self._zeroshot_dir = zeroshot_dir
+class PhraseSynthesis():
+  def __init__(self, ttsmodel_dir: str, participant_dir: str):
+    self._ttsmodel_dir = ttsmodel_dir
     self._participant_dir = participant_dir
-    self._load_zeroshot()
+    self._load_ttsmodel()
     self._load_speaker_encoder()
 
     self._reference_wav_files = []
-    for fpath in os.listdir(participant_path):
+    for fpath in os.listdir(participant_dir):
       if fpath.endswith(WAV_EXT):
-        self._reference_wav_files.append(os.path.join(participant_path, fpath))
+        self._reference_wav_files.append(os.path.join(participant_dir, fpath))
 
     self._synthesis_dir = os.path.join(participant_dir, SYNTHESIS_DIR)
     if not os.path.isdir(self._synthesis_dir):
       os.mkdir(self._synthesis_dir)
 
-  def _load_zeroshot(self) -> None:
+    self._determine_reference_embeddings()
+
+  def _load_ttsmodel(self) -> None:
     # load the config
-    self._tts_config = load_config(os.path.join(self._zeroshot_dir, CONFIG_PATH))
+    self._tts_config = load_config(os.path.join(self._ttsmodel_dir, CONFIG_PATH))
 
     # load the audio processor
-    self._audio_proc = AudioProcessor(**C.audio)
+    self._audio_proc = AudioProcessor(**self._tts_config.audio)
 
     self._tts_config.model_args['d_vector_file'] = TTS_SPEAKERS
     self._tts_config.model_args['use_speaker_encoder_as_loss'] = False
@@ -73,15 +76,15 @@ class PhraseSynthesize():
     if USE_CUDA:
         self._model = self._model.cuda()
 
-  def _load_speaker_encoder(self, zeroshot_dir: str):
+  def _load_speaker_encoder(self):
     self._speaker_encoder = SpeakerManager(
-        encoder_model_path=os.path.join(self._zeroshot_dir, CHECKPOINT_SE_PATH),
-        encoder_config_path=os.path.join(self._zeroshot_dir, CONFIG_SE_PATH),
+        encoder_model_path=os.path.join(self._ttsmodel_dir, CHECKPOINT_SE_PATH),
+        encoder_config_path=os.path.join(self._ttsmodel_dir, CONFIG_SE_PATH),
         use_cuda=USE_CUDA)
 
-  def _determine_reference_embeddings(self, data: dict):
+  def _determine_reference_embeddings(self):
     for sample in self._reference_wav_files:
-        !ffmpeg-normalize $sample -nt rms -t=-27 -o $sample -ar 16000 -f
+      cmd_str = 'ffmpeg-normalize {s} -nt rms -t=-27 -o {s} -ar 16000 -f'.format(s=sample)
     self._reference_emb = self._speaker_encoder.compute_d_vector_from_clip(self._reference_wav_files)
 
   def synthesize_phrases(self, data: dict):
@@ -110,4 +113,7 @@ class PhraseSynthesize():
     out_path = os.path.join(OUT_PATH, file_name)
     print(' > Saving output to {}'.format(out_path))
     self._audio_proc.save_wav(wav, out_path)
+
+if __name__ == '__main__':
+  syn = PhraseSynthesis('./content', './speech_bootstrap/participants/participant1')
 
