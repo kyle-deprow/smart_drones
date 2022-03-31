@@ -1,52 +1,72 @@
 #/usr/bin/python
 
+import os
 import numpy as np
-import pandas as pd
-import torch
-import transformers as ppb # pytorch transformers
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import cross_val_score
-from sklearn.model_selection import train_test_split
-    
+
+import random
+import tensorflow as tf
+import tensorflow_hub as hub
+from wav2vec2 import Wav2Vec2Config
+from wav2vec2 import Wav2Vec2Processor
+from smart_drones.speech_bootstrap.ScriptInterface import ScriptInterface
+from wav2vec2 import CTCLoss
+
+
+AUDIO_MAXLEN = 246000
+LABEL_MAXLEN = 256
+BATCH_SIZE = 2
+
 class SubjectDetectionModel():
   def __init__(self):
-  self.model_class, self.tokenizer_class, self.pretrained_weights =
-    (ppb.DistilBertModel, ppb.DistilBertTokenizer, 'distilbert-base-uncased')
+    self.tokenizer = Wav2Vec2Processor(is_tokenizer=True)
+    self.processor = Wav2Vec2Processor(is_tokenizer=False)
 
-  # Load pretrained model/tokenizer
-  self.tokenizer = tokenizer_class.from_pretrained(pretrained_weights)
-  self.model = model_class.from_pretrained(pretrained_weights)
+  def build_model(self):
+    config = Wav2Vec2Config()
+    pretrained_layer = hub.KerasLayer("https://tfhub.dev/vasudevgupta7/wav2vec2/1", trainable=True)
+    inputs = tf.keras.Input(shape=(AUDIO_MAXLEN,))
+    hidden_states = pretrained_layer(inputs)
+    outputs = tf.keras.layers.Dense(config.vocab_size)(hidden_states)
+    model = tf.keras.Model(inputs=inputs, outputs=outputs)
 
-  def tokenize(self, input_sentences):
-    return [tokenizer.encode(x, add_special_tokens=True) for x in input_sentences]
+    script_if = ScriptInterface('participant1')
+    tokens = script_if.return_syn_subject_tokens()
+    phrases = script_if.return_syn_subject_tokens()
+    sample_length = len(tokens)
+    self.samples = [(script_if.load_audio(i+1), phrase) for i, phrase in enumerate(phrases)]
 
-  def train_test_split(self, X, y, train_percentage):
-    assert len(X) == len(y)
-    size = len(X)
-    return X[:size], y[:size], X[size:], y[size:]
+    output_signature = (
+      tf.TensorSpec(shape=(None),  dtype=tf.float32),
+          tf.TensorSpec(shape=(None), dtype=tf.int32),
+    )
+    dataset = tf.data.Dataset.from_generator(self.inputs_generator, output_signature=output_signature)
+    dataset = dataset.shuffle(sample_length, seed=42)
+    dataset = dataset.padded_batch(sample_length, padded_shapes=(AUDIO_MAXLEN, LABEL_MAXLEN), padding_values=(0.0, 0))
+    dataset = dataset.prefetch(tf.data.AUTOTUNE)
+    num_train_batches = 10
+    num_val_batches = 4
 
-  def train(self, X, y):
-    max_len = 0
-    for i in X:
-        if len(i) > max_len:
-            max_len = len(i)
+    train_dataset = dataset.take(num_train_batches)
+    val_dataset = dataset.skip(num_train_batches).take(num_val_batches)
+    loss_fn = CTCLoss(config, (sample_length, AUDIO_MAXLEN), division_factor=sample_length)
+    optimizer = tf.keras.optimizers.Adam(5e-5)
+    model.compile(optimizer, loss=loss_fn)
+    history = model.fit(train_dataset, validation_data=val_dataset, epochs=3)
+    history.history
 
-    padded = np.array([i + [0]*(max_len-len(i)) for i in tokenized.values])
-    attention_mask = np.where(padded != 0, 1, 0)
-    input_ids = torch.tensor(padded)
-    attention_mask = torch.tensor(attention_mask)
+  def preprocess_text(self, text):
+    label = self.tokenizer(text)
+    return tf.constant(label, dtype=tf.int32)
 
-    with torch.no_grad():
-        last_hidden_states = model(input_ids, attention_mask=attention_mask)
-    features = last_hidden_states[0][:,0,:].numpy()
-    labels = batch_1[1]
-    Xtrain, ytrain, Xtest, ytest = self.train_test_split(X, y, 0.8)
+  def preprocess_speech(self, audio):
+    audio = tf.constant(audio, dtype=tf.float32)
+    return self.processor(tf.transpose(audio))
 
+  def inputs_generator(self):
+    for speech, text in self.samples:
+      yield self.preprocess_speech(speech), self.preprocess_text(text)
 
 if __name__ == '__main__':
-  import argparse
-  parser = argparse.ArgumentParser()
-  parser.add_argument('--data_path', required=True, type=str)
-  args = parser.parse_args()
-  split_data(args.data_path)
+  model = SubjectDetectionModel()
+  model.build_model()
 

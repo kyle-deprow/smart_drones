@@ -37,8 +37,9 @@ def load_subject_data(path: str, n_phrases: int, n_dummy: int) -> dict:
   rand_task_encodings.extend([task_encodings_dummy[i] for i in dummy_ind])
   return {'phrase': rand_sentences, 'subject_encoding': rand_sub_encodings, 'task_encoding': rand_task_encodings}
 
-def generate_participant_scripts(participant_dir: str, database_path: str, n_phrases: int, n_dummy: int) -> None:
-  data = load_subject_data(database_path, n_phrases, n_dummy)
+def generate_participant_scripts(participant_dir: str, database_path=None, n_phrases=0, n_dummy=0, data=None) -> None:
+  if not data:
+      data = load_subject_data(database_path, n_phrases, n_dummy)
   script_file = os.path.join(participant_dir, SCRIPT_FILE)
   json.dump(data, open(script_file, 'w+'), indent=4)
 
