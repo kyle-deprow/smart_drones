@@ -14,7 +14,7 @@ from wav2vec2 import CTCLoss
 
 AUDIO_MAXLEN = 246000
 LABEL_MAXLEN = 256
-BATCH_SIZE = 2
+BATCH_SIZE = 8
 
 class SubjectDetectionModel():
   def __init__(self):
@@ -31,7 +31,7 @@ class SubjectDetectionModel():
 
     script_if = ScriptInterface('participant1')
     tokens = script_if.return_syn_subject_tokens()
-    phrases = script_if.return_syn_subject_tokens()
+    phrases = script_if.return_syn_phrases()
     sample_length = len(tokens)
     self.samples = [(script_if.load_audio(i+1), phrase) for i, phrase in enumerate(phrases)]
 
