@@ -4,7 +4,7 @@ import os
 import json
 import soundfile as sf
 
-PARTICIPANT_DIR = '/local/smart_drones/speech_bootstrap/participants'
+PARTICIPANT_DIR = '/content/smart_drones/speech_bootstrap/participants'
 SYNTHESIS_DIR = 'synthesis'
 SCRIPT_JSON = 'script.json'
 
