@@ -1,0 +1,56 @@
+{
+  "drone_numbers": [
+    "1",
+    "2",
+    "3",
+    "4"
+  ],
+
+  "drone_names": [
+    "drone ",
+    "unit ",
+    "craft ",
+    "quad ",
+    "quadcopter "
+  ],
+
+  "takeoff_phrases": [
+    "takeoff",
+    "fly up",
+    "liftoff"
+  ],
+
+  "shape_phrases": [
+    "fly a ",
+    "fly in a ",
+    "move a ",
+    "move in a ",
+    "make a ",
+    "travel a ",
+    "travel in a ",
+    "position a ",
+    "position in a ",
+    "maneuver a ",
+    "maneuver to "
+  ],
+
+  "shape_tasks": [
+    "circle",
+    "line",
+    "square"
+  ],
+
+  "move_phrases": [
+    "move to ",
+    "fly to ",
+    "position at ",
+    "maneuver to "
+  ],
+
+  "move_tasks": [
+    "point a",
+    "point b"
+  ],
+
+  "dummy_data_directory": "/home/kyle/Downloads/aclImdb/train/unsup/"
+}

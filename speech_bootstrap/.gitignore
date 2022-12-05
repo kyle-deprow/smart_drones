@@ -1,2 +1,4 @@
-content.tar.gz
 participants/*
+**/__pycache__/*
+*/__pycache__/*
+*egg-info*
